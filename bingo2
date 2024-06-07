@@ -1,0 +1,63 @@
+import os
+import pandas as pd
+from linebot.models import TextSendMessage
+from linebot.v3 import MessagingApi
+
+# 从环境变量中获取凭据文件路径和频道访问令牌
+credentials_path = os.getenv('CREDENTIALS_PATH')
+CHANNEL_ACCESS_TOKEN = os.getenv('CHANNEL_ACCESS_TOKEN')
+
+# 如果没有设置凭据文件路径或频道访问令牌，则退出程序
+if not credentials_path or not CHANNEL_ACCESS_TOKEN:
+    print("未设置凭据文件路径或频道访问令牌，请检查环境变量。")
+    exit()
+
+# 创建 MessagingApi 实例
+messaging_api = MessagingApi(CHANNEL_ACCESS_TOKEN)
+
+# 指定文件路径
+file_path = '賓果賓果_2024.csv'  # 替换为您的文件路径
+
+# 读取 CSV 文件
+df123 = pd.read_csv(file_path)
+
+number_columns = [f'獎號{i}' for i in range(1, 21)]
+
+# 找到包含指定三个号码的行
+def find_next_data(df, num1, num2, num3):
+    matches = df[
+        df[number_columns].apply(lambda row: num1 in row.values and num2 in row.values and num3 in row.values, axis=1)
+    ]
+    next_indices = matches.index + 1
+    next_data = df.iloc[next_indices].dropna(how='all')
+    return next_data
+
+# 统计下一笔资料中号码出现的频率
+def top_5_frequent_numbers(next_data):
+    all_numbers = next_data[number_columns].values.flatten()
+    all_numbers = all_numbers[~pd.isna(all_numbers)]
+    number_counts = pd.Series(all_numbers).value_counts()
+    return number_counts.head(5)
+
+# 让用户输入三个号码
+num1 = int(input("请输入第一个号码："))
+num2 = int(input("请输入第二个号码："))
+num3 = int(input("请输入第三个号码："))
+
+# 找到符合条件的下一笔资料
+next_data = find_next_data(df123, num1, num2, num3)
+
+# 统计出现最多次的前5个号码
+top_5_numbers = top_5_frequent_numbers(next_data)
+
+# 设置 Line Bot 接收的消息
+message = f"符合条件的下一笔资料：\n{next_data}\n\n出现最多次的前5个号码：\n{top_5_numbers}"
+
+# 发送消息给所有用户
+messaging_api.broadcast(TextSendMessage(text=message))
+
+# 输出结果
+print("符合条件的下一笔资料：")
+print(next_data)
+print("\n出现最多次的前5个号码：")
+print(top_5_numbers)
